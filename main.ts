@@ -4,11 +4,16 @@
 // What this program does, and nothing else:
 //   1. Reads POST.json from the repository root and checks it is a JSON
 //      object whose "url" names an X post
-//      (https://x.com/<handle>/status/<digits>), or the placeholder the
-//      repository ships with before the post exists.
+//      (https://x.com/<handle>/status/<digits> or the twitter.com form),
+//      or the placeholder the repository ships with before the post
+//      exists. The URL host must be x.com or twitter.com, so a lookalike
+//      domain can never pass as the post address.
 //   2. Checks meme.png is really a PNG (or JPEG) by its magic bytes and
 //      is no bigger than 8 MB, so a broken or missing picture can never
-//      slip through silently.
+//      slip through silently. For a PNG it also reads the IHDR width and
+//      height and requires the short side to be at least 480 px, because
+//      the judge views the meme at 480x480 and a smaller picture would
+//      arrive blurry.
 //   3. Copies POST.json into the output directory, where the gate reads it.
 //
 // Node 22, standard library only. No network, no clock, no randomness:
@@ -29,8 +34,12 @@ const MEME_FILE = 'meme.png';
 const MAX_MEME_BYTES = 8 * 1024 * 1024;
 
 // A real post address, or the placeholder this repository ships with
-// until the post is made and its address is filled in.
-const POST_URL = /^https:\/\/x\.com\/[A-Za-z0-9_]+\/status\/\d+$/;
+// until the post is made and its address is filled in. Only the two
+// genuine X hosts count; anything else is rejected even if the path
+// looks like a status link.
+const POST_PATH = /^\/[A-Za-z0-9_]+\/status\/\d+$/;
+const POST_HOSTS = new Set(['x.com', 'twitter.com']);
+const MIN_SHORT_SIDE_PX = 480;
 const PLACEHOLDER_URL = 'https://x.com/nvtuananhh/status/PLACEHOLDER';
 
 // PNG signature (8 bytes) and JPEG start-of-image marker (3 bytes).
@@ -71,8 +80,19 @@ function checkPost(): void {
   if (typeof url !== 'string') {
     fail(`${POST_FILE} "url" must be a string`);
   }
-  if (url !== PLACEHOLDER_URL && !POST_URL.test(url)) {
-    fail(`${POST_FILE} "url" is not an X post address: ${url}`);
+  if (url !== PLACEHOLDER_URL) {
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      fail(`${POST_FILE} "url" is not a valid URL: ${url}`);
+    }
+    if (!POST_HOSTS.has(parsedUrl!.hostname)) {
+      fail(`${POST_FILE} "url" host must be x.com or twitter.com, got ${parsedUrl!.hostname}`);
+    }
+    if (!POST_PATH.test(parsedUrl!.pathname)) {
+      fail(`${POST_FILE} "url" is not an X post address: ${url}`);
+    }
   }
 }
 
@@ -92,12 +112,29 @@ function checkMeme(): void {
   }
   let head: Buffer;
   try {
-    head = readFileSync(path).subarray(0, 8);
+    head = readFileSync(path).subarray(0, 29);
   } catch (err) {
     fail(`cannot read ${path}: ${(err as Error).message}`);
   }
-  if (!startsWith(head!, PNG_MAGIC) && !startsWith(head!, JPEG_MAGIC)) {
+  const isPng = startsWith(head!, PNG_MAGIC);
+  const isJpeg = startsWith(head!, JPEG_MAGIC);
+  if (!isPng && !isJpeg) {
     fail(`${MEME_FILE} is neither PNG nor JPEG (magic bytes do not match)`);
+  }
+  if (isPng) {
+    // PNG layout: 8-byte signature, 4-byte chunk length, 4-byte chunk
+    // type ("IHDR"), then width and height as big-endian uint32s.
+    if (head!.length < 24 || head!.subarray(12, 16).toString('ascii') !== 'IHDR') {
+      fail(`${MEME_FILE} is a truncated PNG (no IHDR header)`);
+    }
+    const width = head!.readUInt32BE(16);
+    const height = head!.readUInt32BE(20);
+    if (width === 0 || height === 0) {
+      fail(`${MEME_FILE} has a zero PNG dimension (${width}x${height})`);
+    }
+    if (Math.min(width, height) < MIN_SHORT_SIDE_PX) {
+      fail(`${MEME_FILE} is ${width}x${height}, short side under ${MIN_SHORT_SIDE_PX} px`);
+    }
   }
 }
 

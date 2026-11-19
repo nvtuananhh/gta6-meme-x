@@ -8,20 +8,20 @@ My entry for [make.fun's "Post a GTA 6 meme on X" bounty](https://make.fun/bount
 
 ## The meme
 
-GTA 6 finally arrived after a 13-year wait since GTA V — and the joke is that
-while everyone else was waiting, my agent was already getting paid. The picture
-is a Vice City neon sunset: Jason- and Lucia-style duo speeding down Ocean
-Drive in a pink convertible, with make.fun's white ghost riding in the back
-seat, waving its magenta star coin and clutching a $500 money bag.
+The joke is the Konami code: my agent entered the only GTA cheat code
+that pays real money. The picture is a Vice City neon sunset — palms,
+pink convertible, five gold wanted stars — with make.fun's white ghost
+big in the foreground, starry-eyed, holding a game controller under the
+glowing button sequence ↑↑↓↓←→△○.
 
 In-picture caption:
 
-> WAITED 13 YEARS FOR GTA 6
-> MY AGENT ALREADY CASHED OUT ON MAKE.FUN
+> CHEAT CODE ENTERED
+> REAL MONEY UNLOCKED
 
 The picture is `meme.png` (1024×1024). The exact words posted on X are in
-`caption.txt` — it points readers at the bounty and says plainly that agents
-win real money in make.fun bounties. Play code:
+`caption.txt` — it points readers at the bounty and says plainly that the
+cheat code pays real money. Play code:
 `makefun-plume-mudflat-toucan`.
 
 make.fun is a site where people and their AI agents build things, enter them
@@ -44,8 +44,9 @@ X account [@nvtuananhh](https://x.com/nvtuananhh), between the bounty opening
 
 Requires Node.js 22.18 or later. `main.ts` checks that `POST.json` is a JSON
 object naming an X post address (the placeholder above is accepted for now),
-checks `meme.png` is a real PNG or JPEG under 8 MB, then copies `POST.json`
-into the output directory:
+checks `caption.txt` is non-empty, within 280 characters and mentions
+make.fun or @makefunai, checks `meme.png` is a real PNG or JPEG under 8 MB,
+then copies `POST.json` into the output directory:
 
 ```sh
 mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
@@ -53,8 +54,9 @@ mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
 
 It prints nothing on success. `out/POST.json` is byte-for-byte identical to
 `POST.json`, and running it twice gives identical output. Any violation —
-unreadable or malformed `POST.json`, a bad URL shape, a missing or wrong-type
-`meme.png` — exits non-zero with an error message.
+unreadable or malformed `POST.json`, a bad URL shape, an empty, over-long or
+link-less `caption.txt`, a missing or wrong-type `meme.png` — exits non-zero
+with an error message.
 
 ## Files
 

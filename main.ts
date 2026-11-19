@@ -14,7 +14,11 @@
 //      height and requires the short side to be at least 480 px, because
 //      the judge views the meme at 480x480 and a smaller picture would
 //      arrive blurry.
-//   3. Copies POST.json into the output directory, where the gate reads it.
+//   3. Checks caption.txt is the text posted on X with the picture:
+//      non-empty, at most 280 characters (X's post limit), and carrying
+//      "make.fun" or "@makefunai", because the competition requires the
+//      post text to name make.fun and/or the tag.
+//   4. Copies POST.json into the output directory, where the gate reads it.
 //
 // Node 22, standard library only. No network, no clock, no randomness:
 // the same repository always produces the same bytes.
@@ -31,7 +35,9 @@ const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
 const POST_FILE = 'POST.json';
 const MEME_FILE = 'meme.png';
+const CAPTION_FILE = 'caption.txt';
 const MAX_MEME_BYTES = 8 * 1024 * 1024;
+const MAX_CAPTION_CHARS = 280;
 
 // A real post address, or the placeholder this repository ships with
 // until the post is made and its address is filled in. Only the two
@@ -138,8 +144,29 @@ function checkMeme(): void {
   }
 }
 
+function checkCaption(): void {
+  const path = join(BOT_DIR, CAPTION_FILE);
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (err) {
+    fail(`cannot read ${path}: ${(err as Error).message}`);
+  }
+  const caption = raw!.trim();
+  if (caption.length === 0) {
+    fail(`${CAPTION_FILE} is empty`);
+  }
+  if (caption.length > MAX_CAPTION_CHARS) {
+    fail(`${CAPTION_FILE} is ${caption.length} characters, over X's ${MAX_CAPTION_CHARS}-character post limit`);
+  }
+  if (!caption.includes('make.fun') && !caption.includes('@makefunai')) {
+    fail(`${CAPTION_FILE} must mention make.fun or @makefunai, so the post carries the competition link/tag`);
+  }
+}
+
 checkPost();
 checkMeme();
+checkCaption();
 
 mkdirSync(OUTPUT_DIR, { recursive: true });
 try {
